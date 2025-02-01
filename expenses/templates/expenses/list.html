@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>Expenses</h1>
+
+<!-- Year filter form -->
+<form method="get">
+    <label for="year">Filter by Year:</label>
+    <select name="year" id="year" onchange="this.form.submit()">
+        <option value="">All Years</option>
+        {% for year in years %}
+            <option value="{{ year.year }}" {% if year.year|stringformat:"s" == selected_year %}selected{% endif %}>
+                {{ year.year }}
+            </option>
+        {% endfor %}
+    </select>
+</form>
+
+
+<!-- Total of filtered expenses -->
+<h3>Total Amount: ${{ total }}</h3>
+
+<!-- <ul>
+  {% for expense in page_obj %}
+  <li>
+    {{ expense.category }}: {{ expense.transaction_date }} ${{ expense.amount }} - {{ expense.merchant }}
+  </li>
+  {% endfor %}
+</ul> -->
+
+<!-- <div class="pagination">
+  <span>
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+  </span>
+
+  <div>
+    {% if page_obj.has_previous %}
+    <a href="?page=1">&laquo; first</a>
+    <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+    {% if page_obj.number == num %}
+    <strong>{{ num }}</strong>
+    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+    <a href="?page={{ num }}">{{ num }}</a>
+    {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}">next</a>
+    <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+    {% endif %}
+  </div> -->
+
+    <!-- Chart -->
+    <canvas id="expenseChart" width="400" height="200"></canvas>
+
+    <script>
+    // Get chart data from the view
+    var chartData = {{ chart_data|safe }};
+
+    // Extract categories and totals for each month
+    var categories = chartData.categories;
+    var dataByMonth = chartData.data_by_month;
+
+    // Prepare data for the chart
+    var datasets = [];
+    var colors = [
+        'rgba(255, 99, 132, 0.2)',
+        'rgba(54, 162, 235, 0.2)',
+        'rgba(255, 159, 64, 0.2)',
+        'rgba(75, 192, 192, 0.2)',
+        'rgba(153, 102, 255, 0.2)',
+        'rgba(255, 159, 64, 0.2)',
+    ];  // Adjust colors as needed
+
+    var borderColors = [
+        'rgba(255, 99, 132, 1)',
+        'rgba(54, 162, 235, 1)',
+        'rgba(255, 159, 64, 1)',
+        'rgba(75, 192, 192, 1)',
+        'rgba(153, 102, 255, 1)',
+        'rgba(255, 159, 64, 1)',
+    ];
+
+    // Loop over categories and add each as a dataset
+    categories.forEach(function(category, index) {
+        var data = [];
+
+        // Collect the data for each month for this category
+        for (var month = 1; month <= 12; month++) {
+            if (dataByMonth[month] && dataByMonth[month][category]) {
+                data.push(dataByMonth[month][category]);
+            } else {
+                data.push(0);  // If no data, add 0
+            }
+        }
+
+        // Add dataset for the category
+        datasets.push({
+            label: category,
+            data: data,
+            backgroundColor: colors[index % colors.length],
+            borderColor: borderColors[index % borderColors.length],
+            borderWidth: 1,
+        });
+    });
+
+    // Function to handle clicks on the chart
+    function handleClick(event, elements) {
+        if (elements.length > 0) {
+            var element = elements[0];
+
+            // Get the month (x-axis index) and category (dataset index)
+            var monthIndex = element.index;
+            var categoryIndex = element.datasetIndex;
+            const year = document.getElementById('year').value;
+
+            // Convert the index to the actual month
+            var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            var month = months[monthIndex];
+
+            // Get the corresponding category
+            var category = datasets[categoryIndex].label;
+
+            // Redirect or open a new page with the month and category details
+            var url = `/expenses/details?month=${monthIndex + 1}&year=${year}&category=${encodeURIComponent(category)}`;
+            window.location.href = url;
+        }
+    }
+
+    // Calculate total for each month
+    var monthlyTotals = [];
+    for (var month = 1; month <= 12; month++) {
+        var total = 0;
+        categories.forEach(function(category) {
+            if (dataByMonth[month] && dataByMonth[month][category]) {
+                total += dataByMonth[month][category];
+            }
+        });
+        monthlyTotals.push(total);
+    }
+
+    // Create the stacked bar chart
+    var ctx = document.getElementById('expenseChart').getContext('2d');
+    var expenseChart = new Chart(ctx, {
+        type: 'bar',  // Bar chart
+        data: {
+            labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            onClick: function(event, elements) {
+                handleClick(event, elements);
+            },
+            scales: {
+                x: {
+                    stacked: true
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            },
+            // Add custom function to draw totals
+            animation: {
+                onComplete: function() {
+                    var ctx = this.ctx;
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+
+                    const instance = this;
+                    // Iterate through the datasets and draw the totals
+                    this.data.datasets.forEach(function(dataset, i) {
+                        var meta = instance.getDatasetMeta(i);
+                        if (!meta.hidden) {
+                            meta.data.forEach(function(bar, index) {
+                                if (i === instance.data.datasets.length - 1) {
+                                    // Draw the total only once (on top of the stacked bars)
+                                    var total = monthlyTotals[index];
+                                    ctx.fillText(`$${total}`, bar.x, bar.y - 5);
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

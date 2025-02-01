@@ -1,0 +1,10 @@
+<h1>Expenses for {{ category }} in Month {{ month }} {{year}}</h1>
+
+<ul>
+  {% for expense in expenses %}
+  <li>
+    {{ expense.transaction_date }} - ${{ expense.amount }} - 
+    {{ expense.merchant}}
+  </li>
+  {% endfor %}
+</ul>
