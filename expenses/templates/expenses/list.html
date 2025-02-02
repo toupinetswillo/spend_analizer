@@ -113,7 +113,8 @@
             // Get the month (x-axis index) and category (dataset index)
             var monthIndex = element.index;
             var categoryIndex = element.datasetIndex;
-            const year = document.getElementById('year').value;
+            const today = new Date()
+            const year = document.getElementById('year').value || today.getFullYear();
 
             // Convert the index to the actual month
             var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

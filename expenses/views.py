@@ -89,9 +89,10 @@ def list(request):
         'total': total_in_year
     })
 
-def index(request):
-    return render(request, 'expenses/index.html')
 
+@login_required
+def index(request):
+    return redirect('expenses:list')
 
 @login_required
 def upload_csv(request):
