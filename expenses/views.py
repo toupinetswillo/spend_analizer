@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.core.files.storage import default_storage
 from .models import Receipt, Expense
 from .forms import ReceiptForm, CSVUploadForm
 import pytesseract
@@ -8,9 +9,10 @@ from django.contrib.auth.decorators import login_required
 import csv
 from io import TextIOWrapper
 from datetime import datetime
-from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import Sum
-
+from .utils import parse_receipt
+import cv2
+import numpy as np
 
 @login_required
 def upload_receipt(request):
@@ -23,17 +25,21 @@ def upload_receipt(request):
 
             # OCR processing
             image_path = receipt.image.path
-            text = pytesseract.image_to_string(Image.open(image_path))
+            with Image.open(image_path) as f:
+                resized = f.resize((f.width * 3, f.height * 3))
+                text = pytesseract.image_to_string(resized)
+            print(text)
+            print(parse_receipt(text))
 
             # Process the extracted text (basic example)
             # This can be improved to parse text into categories, amounts, etc.
             # For simplicity, we add it as a single "uncategorized" expense
-            Expense.objects.create(
-                receipt=receipt,
-                category='Uncategorized',
-                amount=0,  # You'd extract this from OCR in real scenario
-                description=text
-            )
+            # Expense.objects.create(
+            #     receipt=receipt,
+            #     category='Uncategorized',
+            #     amount=0,  # You'd extract this from OCR in real scenario
+            #     description=text
+            # )
             return redirect('expenses:index')
     else:
         form = ReceiptForm()
@@ -68,7 +74,8 @@ def list(request):
             data_by_month[month][category] = 0
         data_by_month[month][category] += total
         categories.add(category)
-        total_in_year += total
+        if total > 0:
+          total_in_year += total
 
     # Sort categories to maintain consistent order in chart
     categories = sorted(categories)
@@ -107,6 +114,7 @@ def upload_csv(request):
             next(reader, None)
 
             # Process each row in the CSV
+            created_records_number = 0
             for row in reader:
                 try:
                     # Assuming the CSV columns: amount, category, description, date
@@ -117,17 +125,22 @@ def upload_csv(request):
                     category = row[4]
 
                     # Create a new expense entry
-                    Expense.objects.create(
-                        receipt=None,  # Optional - link to a receipt if relevant
+                    _, created = Expense.objects.get_or_create(
                         category=category,
                         amount=amount,
                         merchant=merchant,
                         transaction_date=trans_date,
-                        post_date=post_date
+                        post_date=post_date,
+                        defaults={
+                            'receipt': None,  # Optional - link to a receipt if relevant
+                            'description': ''  # Optional - add a description if needed
+                        }
                     )
+                    if created:
+                        created_records_number += 1
                 except Exception as e:
                     print(f"Error processing row {row}: {e}")
-
+            print(f"Created {created_records_number} records")
             return redirect('expenses:index')
     else:
         form = CSVUploadForm()
