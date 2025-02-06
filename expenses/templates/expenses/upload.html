@@ -1,7 +1,214 @@
-{% extends 'base.html' %} 
-{% block content %}
-<form method="post" enctype="multipart/form-data">
-  {% csrf_token %} {{ form.as_p }}
-  <button type="submit">Upload Receipt</button>
-</form>
-{% endblock %}
+{% extends 'base.html' %} {% block content %}
+<div class="card shadow mb-4 mt-4">
+  <div class="card-header">
+    <h6 class="m-0 font-weight-bold text-primary">Upload your receipt</h6>
+  </div>
+  <div class="card-body"><form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <div class="d-flex align-items-center justify-content-between">
+    <input type="file" name="files" accept="image/*" multiple />
+  <button type="submit" class="btn btn-primary">Upload Receipts</button>
+  </div>
+</form></div>
+</div>
+
+{% if uploaded_file_urls %}
+<p>
+  Receipt uploaded:
+  <div class="d-flex" style="gap: 20px">
+    {% for uploaded_file_url in uploaded_file_urls %}
+
+  <div>
+    <a href="{{ uploaded_file_url }}">
+    <img
+      src="{{ uploaded_file_url }}"
+      alt="Receipt"
+      style="width: 100px; height: 200px"
+    />
+  </a>
+  </div>
+  {% endfor %}
+  </div>
+</p>
+{% endif %}
+{% if expense %}
+<h2>Info</h2>
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <h6 class="m-0 font-weight-bold text-primary d-flex justify-content-between align-items-center">Receipt Info
+      <button type="button" class="btn btn-danger" id="remove-btn">Remove</button>
+    </h6>
+  </div>
+  <div class="card-body info">
+    <div class="d-flex align-items-center justify-content-between mx-2">
+      <select value="{{ expense.merchant }}" class="form-control mr-2" name="merchant">
+        <option value="aldi">Aldi</option>
+        <option value="amazon">Amazon</option>
+        <option value="bestbuy">Best Buy</option>
+        <option value="costco">Costco</option>
+        <option value="jerysfruitmarket">Jery's Fruit Market</option>
+        <option value="JewelOsco">JewelOsco</option>
+        <option value="marianos">Marianos</option>
+        <option value="other">Other</option>
+        <option value="target">Target</option>
+        <option value="traderjoes">Trader Joes</option>
+        <option value="wallgreens">Wallgreens</option>
+        <option value="walmart">Walmart</option>
+        <option value="wholefoods">Whole Foods</option>
+        <option value="other">Other</option>
+      </select>
+      <input type="date" name="post_date" class="form-control mr-2" value="{{ expense.post_date }}">
+      <select name="category" class="form-control mr-2" value="{{ expense.category }}">
+        <option value="Supermarkets">Supermarkets</option>
+        <option value="IKEA">IKEA</option>
+
+      </select>
+      <input type="hidden" name="id" value="{{ expense.id }}">
+      <button class="btn btn-primary" id="edit-info-button">Edit</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% if records %}
+<h2>Expenses</h2>
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <h6 class="m-0 font-weight-bold text-primary d-flex align-items-center justify-content-between">Receipt Items
+      <button class="btn btn-primary" id="edit-button" type="button">Edit</button>
+    </h6>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <div class="row">
+        <div class="col-sm-12">
+          <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for expense in records %}
+              <tr>
+                <td>
+                  <input class="form-control" type="text" name="description_{{ expense.id }}" value="{{ expense.description }}" />
+                </td>
+                <td>
+                  <input class="form-control" type="number" name="price_{{ expense.id }}" value="{{ expense.price }}" />
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const inputs = document.querySelectorAll('table input');
+  let editMode = false;
+  let editInfo = false;
+  for(input of inputs) {
+    input.setAttribute('readonly', true);
+  }
+
+  function handleEditInfo(){
+    editInfo = !editInfo;
+    this.innerHTML = editInfo ? 'Save' : 'Edit';
+    const inputs = document.querySelectorAll('.card-body.info input');
+    for(input of inputs) {
+      if(editInfo) {
+        input.removeAttribute('readonly');
+      } else {
+        input.setAttribute('readonly', true);
+      }
+    }
+
+    if(!editInfo) {
+      const data = {};
+      for(input of inputs) {
+        const key = input.name;
+        data[key] = input.value;
+      }
+      fetch('/expenses/update-expense-info/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(data)
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log('Success:', data);
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+      });
+    }
+  }
+
+  function handleEdit() {
+    editMode = !editMode;
+    this.innerHTML = editMode ? 'Save' : 'Edit';
+    for(input of inputs) {
+      if(editMode) {
+        input.removeAttribute('readonly');
+      } else {
+        input.setAttribute('readonly', true);
+      }
+    }
+
+    if (!editMode) {
+      const data = [];
+      for(input of inputs) {
+        const [key, id] = input.name.split('_');
+        const item = data.find(item => item.id === id);
+        if (item) {
+          item[key] = input.value;
+          continue;
+        } else {
+          data.push({ id, [key]: input.value });
+        }
+      }
+      fetch('/expenses/update-expense-items/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(data)
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log('Success:', data);
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+      });
+    }
+  }
+
+  function handleRemoveRecept() {
+    fetch('/expenses/remove-receipt/' + {{ expense.id }} + '/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Success:', data);
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+    });
+  }
+  document.getElementById('edit-button').addEventListener('click', handleEdit);
+  document.getElementById('edit-info-button').addEventListener('click', handleEditInfo);
+  document.getElementById('remove-btn').addEventListener('click', handleRemoveRecept);
+</script>
+{% endif %} {% endblock %}
