@@ -11,7 +11,7 @@ import csv
 from io import TextIOWrapper
 from datetime import datetime
 from django.db.models import Sum
-from .utils import parse_receipt, preprocess_image, skew_correction
+from .utils import parse_receipt, preprocess_image, skew_correction, show_image
 import cv2
 import boto3
 from django.conf import settings
@@ -46,10 +46,16 @@ def upload_receipt(request):
       if image is not None:
         resized = cv2.resize(image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
         gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-        _, binary_image = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
-        denoised_image = cv2.GaussianBlur(binary_image, (5, 5), 0)
+        # show_image('Gray Image', gray)
+        # binary_image = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        # show_image('Binary Image', binary_image)
+        denoised_image = cv2.GaussianBlur(gray, (5, 5), 0)
+        # show_image('Denoised Image', denoised_image)
+        # Use a morphological operation to remove noise
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         morph_image = cv2.morphologyEx(denoised_image, cv2.MORPH_CLOSE, kernel)
+        # show_image('Morph Image', morph_image)
+        # Set tesseract configuration for OCR
         config = '--oem 3 --psm 6'
         text = pytesseract.image_to_string(morph_image, config=config, lang='eng')
         data = parse_receipt(text)
@@ -59,7 +65,17 @@ def upload_receipt(request):
       else:
         print("Failed to load image.")
 
-    formatted_date = datetime.strptime(date, '%m/%d/%Y').strftime("%Y-%m-%d") if date else None
+
+
+    formatted_date = None
+    if date:
+      try:
+          # Try parsing with four-digit year first
+          formatted_date = datetime.strptime(date, '%m/%d/%Y').strftime("%Y-%m-%d")
+      except ValueError:
+          # If parsing fails, try with two-digit year
+          formatted_date = datetime.strptime(date, '%m/%d/%y').strftime("%Y-%m-%d")
+    print(data)
     expense, created = Expense.objects.get_or_create(
       amount=total,
       post_date=formatted_date if date else None,
@@ -76,14 +92,19 @@ def upload_receipt(request):
       for receipt in receipts:
           expense.receipts.add(receipt)
       expense.save()
+    elif expense.receipts.count() == 0:
+      for receipt in receipts:
+          expense.receipts.add(receipt)
+      expense.save()
 
 
-    ommit_items = ['Total', 'Tax:', 'Net Sales', 'Subtotal', 'Reg', 'are Di scover']
+
+    ommit_items = ['total', 'amount', 'tax', 'subtotal', 'reg', 'SALES', 'CHANGE', 'are Di scover', 'Discover', 'DISCOVER', 'BALANCE']
     records = []
     for item in items:
       omit = False
       for ommit_item in ommit_items:
-          if ommit_item in item['description']:
+          if ommit_item.lower() in item['description'].lower():
               omit = True
               break
       if omit:

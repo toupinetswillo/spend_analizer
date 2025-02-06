@@ -3,6 +3,7 @@ import cv2
 import pytesseract
 from PIL import Image
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Path to Tesseract executable
 pytesseract.pytesseract.tesseract_cmd = r'/usr/local/bin/tesseract'  # Update this path as needed
@@ -17,9 +18,10 @@ def parse_receipt(text):
 
     # Split the text into lines for easier processing
     lines = text.splitlines()
+    print(text)
 
     # Extract the date using a regular expression (matches formats like "01/25/2025" or "2025-01-25")
-    date_pattern = r'\b(\d{2}/\d{2}/\d{4})\b|\b(\d{4}-\d{2}-\d{2})\b'
+    date_pattern = r'\b(\d{2}/\d{2}/\d{4})\b|\b(\d{4}-\d{2}-\d{2})\b|\b(\d{2}/\d{2}/\d{2})\b|\b(\d{2}-\d{2}-\d{2})\b'
     for line in lines:
         date_match = re.search(date_pattern, line)
         if date_match:
@@ -40,7 +42,7 @@ def parse_receipt(text):
             })
 
     # Extract the total (typically a line that starts with "Total")
-    total_pattern = r'Total\s*[:]\s*\$?(\d+\.\d{2})'
+    total_pattern = r'(?:Total|BALANCE)\s*:?\s*\$?(\d+\.\d{2})'
     for line in lines:
         total_match = re.search(total_pattern, line)
         if total_match:
@@ -48,6 +50,12 @@ def parse_receipt(text):
             break
 
     return receipt_data
+
+
+def show_image(title, img):
+    plt.imshow(img, cmap='gray')
+    plt.title(title)
+    plt.show()
 
 def preprocess_image(image_path):
     """
