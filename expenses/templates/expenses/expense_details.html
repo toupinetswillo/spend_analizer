@@ -18,6 +18,11 @@
       </td>
       <td>
         {{ expense.merchant }}
+        {% if expense.image %}
+        <a href="{{ expense.image.url }}" target="_blank">
+          <img src="{{ expense.image.url }}" width="50" height="50" />
+        </a>
+        {% endif %}
       </td>
       <td>
         ${{ expense.amount }}

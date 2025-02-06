@@ -42,9 +42,10 @@ def upload_receipt(request):
     items = []
     total = 0
     date = None
+    merchant = None
     for image in images:
       if image is not None:
-        resized = cv2.resize(image, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+        resized = cv2.resize(image, None, fx=6, fy=6, interpolation=cv2.INTER_CUBIC)
         gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
         # show_image('Gray Image', gray)
         # binary_image = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
@@ -61,11 +62,11 @@ def upload_receipt(request):
         data = parse_receipt(text)
         total = data['total'] if data['total'] else total
         date = data['date'] if data['date'] else date
+        merchant = data['merchant'] if data['merchant'] else merchant
         items.extend(data['items'])
+        print(data)
       else:
         print("Failed to load image.")
-
-
 
     formatted_date = None
     if date:
@@ -75,20 +76,20 @@ def upload_receipt(request):
       except ValueError:
           # If parsing fails, try with two-digit year
           formatted_date = datetime.strptime(date, '%m/%d/%y').strftime("%Y-%m-%d")
-    print(data)
-    expense, created = Expense.objects.get_or_create(
+    expense, updated = Expense.objects.update_or_create(
       amount=total,
       post_date=formatted_date if date else None,
       category='Supermarket',
       defaults={
-          "merchant": 'Not specified',
+          "merchant": merchant.lower().replace(' ', '') if merchant is not None else 'Not specified',
           "category": 'Supermarket',
+          "amount": total,
           "transaction_date": formatted_date if date else datetime.now(),
           "post_date": formatted_date if formatted_date else datetime.now(),
       }
     )
 
-    if created:
+    if updated:
       for receipt in receipts:
           expense.receipts.add(receipt)
       expense.save()
@@ -99,7 +100,7 @@ def upload_receipt(request):
 
 
 
-    ommit_items = ['total', 'amount', 'tax', 'subtotal', 'reg', 'SALES', 'CHANGE', 'are Di scover', 'Discover', 'DISCOVER', 'BALANCE']
+    ommit_items = ['total', 'amount', 'tax', 'subtotal', 'reg', 'SALES', 'CHANGE', 'are Di scover', 'Discover', 'scover', '5659', 'DISCOVER', 'BALANCE']
     records = []
     for item in items:
       omit = False
@@ -234,7 +235,7 @@ def expense_details(request):
         transaction_date__month=month,
         transaction_date__year=year,
         category=category
-      )
+      ).select_related('receipt')
 
     return render(request, 'expenses/expense_details.html', {
         'expenses': expenses,

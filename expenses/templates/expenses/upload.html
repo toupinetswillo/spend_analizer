@@ -42,20 +42,20 @@
   <div class="card-body info">
     <div class="d-flex align-items-center justify-content-between mx-2">
       <select value="{{ expense.merchant }}" class="form-control mr-2" name="merchant">
-        <option value="aldi">Aldi</option>
-        <option value="amazon">Amazon</option>
-        <option value="bestbuy">Best Buy</option>
-        <option value="costco">Costco</option>
-        <option value="jerysfruitmarket">Jery's Fruit Market</option>
-        <option value="JewelOsco">JewelOsco</option>
-        <option value="marianos">Marianos</option>
-        <option value="other">Other</option>
-        <option value="target">Target</option>
-        <option value="traderjoes">Trader Joes</option>
-        <option value="wallgreens">Wallgreens</option>
-        <option value="walmart">Walmart</option>
-        <option value="wholefoods">Whole Foods</option>
-        <option value="other">Other</option>
+        <option {% if expense.merchant == "aldi" %} selected {% endif %} value="aldi">Aldi</option>
+        <option {% if expense.merchant == "amazon" %} selected {% endif %} value="amazon">Amazon</option>
+        <option {% if expense.merchant == "bestbuy" %} selected {% endif %} value="bestbuy">Best Buy</option>
+        <option {% if expense.merchant == "costco" %} selected {% endif %} value="costco">Costco</option>
+        <option {% if expense.merchant == "jerysfruitmarket" %} selected {% endif %} value="jerysfruitmarket">Jery's Fruit Market</option>
+        <option {% if expense.merchant == "jewelosco" %} selected {% endif %} value="jewelosco">JewelOsco</option>
+        <option {% if expense.merchant == "marianos" %} selected {% endif %} value="marianos">Marianos</option>
+        <option {% if expense.merchant == "other" %} selected {% endif %} value="other">Other</option>
+        <option {% if expense.merchant == "target" %} selected {% endif %} value="target">Target</option>
+        <option {% if expense.merchant == "traderjoes" %} selected {% endif %} value="traderjoes">Trader Joes</option>
+        <option {% if expense.merchant == "wallgreens" %} selected {% endif %} value="wallgreens">Wallgreens</option>
+        <option {% if expense.merchant == "walmart" %} selected {% endif %} value="walmart">Walmart</option>
+        <option {% if expense.merchant == "wholefoods" %} selected {% endif %} value="wholefoods">Whole Foods</option>
+        <option {% if expense.merchant == "other" %} selected {% endif %} value="other">Other</option>
       </select>
       <input type="date" name="post_date" class="form-control mr-2" value="{{ expense.post_date }}">
       <select name="category" class="form-control mr-2" value="{{ expense.category }}">
@@ -99,6 +99,10 @@
                 </td>
               </tr>
               {% endfor %}
+              <tr>
+                <td>Total</td>
+                <td>{{ expense.amount }}</td>
+              </tr>
             </tbody>
           </table>
         </div>

@@ -10,15 +10,16 @@ pytesseract.pytesseract.tesseract_cmd = r'/usr/local/bin/tesseract'  # Update th
 
 def parse_receipt(text):
     # Initialize the receipt data dictionary
+    print(text)
     receipt_data = {
         'total': None,
         'items': [],
-        'date': None
+        'date': None,
+        'merchant': None
     }
 
     # Split the text into lines for easier processing
     lines = text.splitlines()
-    print(text)
 
     # Extract the date using a regular expression (matches formats like "01/25/2025" or "2025-01-25")
     date_pattern = r'\b(\d{2}/\d{2}/\d{4})\b|\b(\d{4}-\d{2}-\d{2})\b|\b(\d{2}/\d{2}/\d{2})\b|\b(\d{2}-\d{2}-\d{2})\b'
@@ -29,12 +30,12 @@ def parse_receipt(text):
             break
 
     # Extract line items and prices (looks for lines with a description followed by a price)
-    item_pattern = r'(.+?)\s+(\$?\d+\.\d{2})'
+    item_pattern = r'(.+?)\s+([$\u00A3f]?\d+\.\d{0,2})'
     for line in lines:
         item_match = re.search(item_pattern, line)
         if item_match:
             description = item_match.group(1).strip()
-            price = float(item_match.group(2).replace('$', '').strip())
+            price = float(item_match.group(2).replace('$', '').replace('£', '').replace('f', '').strip())
             receipt_data['items'].append({
                 'description': description,
                 'price': price,
@@ -42,13 +43,26 @@ def parse_receipt(text):
             })
 
     # Extract the total (typically a line that starts with "Total")
-    total_pattern = r'(?:Total|BALANCE)\s*:?\s*\$?(\d+\.\d{2})'
+    total_pattern = r'(?:total|balance|total\spurchase)\s*:?\s*\$?(\d+(?:[\.\s,]+\d{2}))'
     for line in lines:
-        total_match = re.search(total_pattern, line)
-        if total_match:
-            receipt_data['total'] = float(total_match.group(1).strip())
-            break
+        lower_line = line.lower()
+        total_match = re.search(total_pattern, lower_line)
+        print(total_match)
+        if total_match and 'health item' not in lower_line and 'subtotal' not in lower_line:
+          # Regular expression to match the format with space between digits
+          updated_string = re.sub(r'(\d+)(?:[\s,])+(\d{2})', r'\1.\2', total_match.group(1).strip())
+          print(updated_string)
+          receipt_data['total'] = float(updated_string)
+          break
 
+    # Extract the merchant name (first line that doesn't contain a number)
+    merchant_pattern = r'(Whole Foods|Walmart|Target|Safeway|Kroger|Costco|Trader Joe\'s|Publix|Aldi|Amazon|Walgreens|CVS|Home Depot|Lowe\'s|Best Buy|Staples|Office Depot|OfficeMax|Dollar General|Dollar Tree|Family Dollar|Dollar General|Dollar Tree|Family Dollar|IKEA|Bed Bath & Beyond|Michaels|Joann|Hobby Lobby|Petco|PetSmart|Pet Supplies Plus|Chewy|Tractor Supply Co|Ace Hardware|True Value|Sherwin-Williams|Menards|Lumber Liquidators|Floor & Decor|Harbor Freight|O\'Reilly Auto Parts|AutoZone|Advance Auto Parts|NAPA Auto Parts|Pep Boys|Carquest)'
+
+    for line in lines:
+        merchant_match = re.search(merchant_pattern, line, re.IGNORECASE)
+        if merchant_match:
+            receipt_data['merchant'] = merchant_match.group(1)
+            break
     return receipt_data
 
 
